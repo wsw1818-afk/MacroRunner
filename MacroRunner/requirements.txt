@@ -1,0 +1,4 @@
+# MacroRunner 의존성
+pywin32>=305
+pytest>=7.0.0
+pytest-cov>=4.0.0

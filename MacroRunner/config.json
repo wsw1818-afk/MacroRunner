@@ -1,0 +1,14 @@
+{
+  "theme": "dark",
+  "auto_backup": true,
+  "max_backups": 10,
+  "syntax_highlight": true,
+  "line_numbers": true,
+  "last_program": "excel",
+  "last_macro": "\uc5d1\uc140 \uc0ac\uc9c4 \ub123\uae30",
+  "window_geometry": "1200x800+187+163",
+  "ui_font": "Segoe UI",
+  "code_font": "Consolas",
+  "ui_size": 12,
+  "code_size": 14
+}

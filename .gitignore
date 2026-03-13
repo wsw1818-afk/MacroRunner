@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+*.egg
+
+# Build artifacts
+MacroRunner/_internal/
+MacroRunner/build/
+MacroRunner/dist/
+MacroRunner/installer_output/
+MacroRunner/MacroRunner.exe
+MacroRunner/nul
+
+# Backups
+MacroRunner/backups/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+.DS_Store
