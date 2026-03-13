@@ -466,38 +466,82 @@ class OfficeConnector:
         """PPT 매크로를 Python으로 직접 실행"""
         try:
             from .ppt_macro_executor import ppt_executor
+            import tkinter.simpledialog as sd
+            import tkinter.messagebox as mb
 
-            # 함수 이름에 따라 모드 결정
             func_lower = function_name.lower()
+            doc_index = self._selected_document_index.get("ppt")
 
-            if "비율무시" in func_lower or "비율_무시" in func_lower:
+            # 압축 전용 함수 처리 (이미지 배치 없이 안내만 표시)
+            is_compress_only = (
+                "압축만" in func_lower or
+                func_lower in ("전체이미지압축", "현재슬라이드압축") or
+                ("압축" in func_lower and "비율" not in func_lower and "여백" not in func_lower)
+            )
+            if is_compress_only:
+                mb.showinfo(
+                    "이미지 압축 안내",
+                    "추가 용량 절감을 위해:\n"
+                    "1. 파일 > 다른 이름으로 저장\n"
+                    "2. 도구 > 그림 압축 선택\n"
+                    "3. 원하는 해상도 선택 (권장: 웹 150ppi)"
+                )
+                return True, "이미지 압축 안내 표시됨"
+
+            # 배치 모드 결정
+            if "비율무시" in func_lower:
                 mode = 1
-            elif "비율유지" in func_lower or "비율_유지" in func_lower:
+            elif "비율유지" in func_lower:
                 mode = 2
             elif "여백" in func_lower:
                 mode = 3
             else:
-                # 기본값: 비율 유지
                 mode = 2
 
-            # 선택된 문서 인덱스 전달
-            doc_index = self._selected_document_index.get("ppt")
-            return ppt_executor.execute_image_placement(mode=mode, margin=0, doc_index=doc_index)
+            # 여백맞춤(mode=3)일 때 margin 입력받기
+            margin = 0.0
+            if mode == 3:
+                val = sd.askfloat(
+                    "여백 입력",
+                    "테두리 안 여백(포인트)을 입력하세요.\n가로/세로 동일 수치로 적용됩니다.\n예: 10",
+                    initialvalue=10.0,
+                    minvalue=0.0
+                )
+                if val is None:
+                    return False, "취소됨"
+                margin = val
+
+            result = ppt_executor.execute_image_placement(mode=mode, margin=margin, doc_index=doc_index)
+
+            # 배치+압축 함수인 경우 압축 안내 추가
+            if result[0] and "압축" in func_lower:
+                mb.showinfo(
+                    "이미지 압축 안내",
+                    "배치 완료!\n\n추가 용량 절감을 위해:\n"
+                    "1. 파일 > 다른 이름으로 저장\n"
+                    "2. 도구 > 그림 압축 선택\n"
+                    "3. 원하는 해상도 선택 (권장: 웹 150ppi)"
+                )
+            return result
 
         except Exception as e:
             return False, f"PPT 직접 실행 실패: {e}"
 
     def extract_functions(self, code: str) -> List[Tuple[str, str]]:
-        """코드에서 Sub/Function 추출"""
+        """코드에서 Public Sub/Function 추출 (Private 제외)"""
         functions = []
 
-        # Sub 찾기
-        for match in re.finditer(r'\bSub\s+(\w+)\s*\(', code, re.IGNORECASE):
-            functions.append(("Sub", match.group(1)))
+        # Sub 찾기 (Private 제외)
+        for match in re.finditer(r'^[ \t]*((Private|Public|Friend)\s+)?Sub\s+(\w+)\s*\(', code, re.IGNORECASE | re.MULTILINE):
+            if match.group(2) and match.group(2).lower() == 'private':
+                continue
+            functions.append(("Sub", match.group(3)))
 
-        # Function 찾기
-        for match in re.finditer(r'\bFunction\s+(\w+)\s*\(', code, re.IGNORECASE):
-            functions.append(("Function", match.group(1)))
+        # Function 찾기 (Private 제외)
+        for match in re.finditer(r'^[ \t]*((Private|Public|Friend)\s+)?Function\s+(\w+)\s*\(', code, re.IGNORECASE | re.MULTILINE):
+            if match.group(2) and match.group(2).lower() == 'private':
+                continue
+            functions.append(("Function", match.group(3)))
 
         return functions
 

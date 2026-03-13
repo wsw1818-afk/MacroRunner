@@ -357,17 +357,21 @@ class CodeEditor(ttk.Frame):
         self._on_change_callback = callback
 
     def extract_functions(self) -> List[Tuple[str, str]]:
-        """코드에서 Sub/Function 추출"""
+        """코드에서 Public Sub/Function 추출 (Private 제외)"""
         code = self.get_code()
         functions = []
 
-        # Sub 찾기
-        for match in re.finditer(r'\bSub\s+(\w+)\s*\(', code, re.IGNORECASE):
-            functions.append(("Sub", match.group(1)))
+        # Sub 찾기 (Private 제외)
+        for match in re.finditer(r'^[ \t]*((Private|Public|Friend)\s+)?Sub\s+(\w+)\s*\(', code, re.IGNORECASE | re.MULTILINE):
+            if match.group(2) and match.group(2).lower() == 'private':
+                continue
+            functions.append(("Sub", match.group(3)))
 
-        # Function 찾기
-        for match in re.finditer(r'\bFunction\s+(\w+)\s*\(', code, re.IGNORECASE):
-            functions.append(("Function", match.group(1)))
+        # Function 찾기 (Private 제외)
+        for match in re.finditer(r'^[ \t]*((Private|Public|Friend)\s+)?Function\s+(\w+)\s*\(', code, re.IGNORECASE | re.MULTILINE):
+            if match.group(2) and match.group(2).lower() == 'private':
+                continue
+            functions.append(("Function", match.group(3)))
 
         return functions
 
