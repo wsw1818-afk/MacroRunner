@@ -54,6 +54,6 @@ if errorlevel 1 (
 
 echo.
 echo 빌드가 완료되었습니다.
-echo 결과물: 결과물\MacroRunner\MacroRunner.exe
+echo 결과물: D:\OneDrive\코드작업\결과물\MacroRunner\MacroRunner.exe
 echo.
 pause

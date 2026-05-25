@@ -27,7 +27,8 @@ if (Test-Path $exePath) {
 }
 
 $resultFolderName = ([string][char]0xACB0) + ([string][char]0xACFC) + ([string][char]0xBB3C)
-$resultDir = Join-Path $PSScriptRoot $resultFolderName
+$codeWorkName = ([string][char]0xCF54) + ([string][char]0xB4DC) + ([string][char]0xC791) + ([string][char]0xC5C5)
+$resultDir = Join-Path (Join-Path "D:\OneDrive" $codeWorkName) $resultFolderName
 
 Push-Location $PSScriptRoot
 try {

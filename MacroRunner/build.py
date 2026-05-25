@@ -12,7 +12,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).parent
 DIST_DIR = PROJECT_ROOT / "dist"
 BUILD_DIR = PROJECT_ROOT / "build"
-RESULT_DIR = PROJECT_ROOT / "결과물"
+RESULT_DIR = Path(r"D:\OneDrive\코드작업\결과물")
 
 def clean():
     """이전 빌드 정리"""
@@ -111,10 +111,10 @@ if ($result.Status -eq 'Valid') {{
         capture_output=True, text=True
     )
     if result.returncode == 0:
-        print("✅ 코드 서명 적용 완료")
+        print("Code signing complete.")
         return True
     else:
-        print(f"❌ 코드 서명 실패: {result.stderr.strip()}")
+        print(f"Code signing failed: {result.stderr.strip()}")
         return False
 
 def copy_results():
@@ -126,11 +126,13 @@ def copy_results():
         print("복사할 빌드 결과물이 없습니다.")
         return False
 
-    if RESULT_DIR.exists():
-        shutil.rmtree(RESULT_DIR)
-
     RESULT_DIR.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(app_source, app_target)
+
+    stale_installer = RESULT_DIR / "MacroRunner_Setup.exe"
+    if stale_installer.exists():
+        stale_installer.unlink()
+
+    shutil.copytree(app_source, app_target, dirs_exist_ok=True)
 
     print("\n" + "=" * 50)
     print("결과물 복사 완료!")
