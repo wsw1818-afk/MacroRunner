@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 from typing import Optional
 from datetime import datetime
+from dataclasses import replace
 import re
 
 from ..core.macro_manager import MacroManager, Macro
@@ -374,10 +375,14 @@ class MainWindow(tk.Tk):
             error_msg = "\n".join([f"Line {line}: {msg}" for line, msg in errors[:3]])
             self.statusbar.log_warning("문법 오류", error_msg)
 
-        self._current_macro.code = self.code_editor.get_code()
-        self._current_macro.description = self.description_entry.get()
+        updated_macro = replace(
+            self._current_macro,
+            code=self.code_editor.get_code(),
+            description=self.description_entry.get()
+        )
 
-        if self.macro_manager.update(self._current_macro):
+        if self.macro_manager.update(updated_macro):
+            self._current_macro = updated_macro
             self.macro_manager.save()
             self._unsaved_changes = False
             self._update_modified_label()

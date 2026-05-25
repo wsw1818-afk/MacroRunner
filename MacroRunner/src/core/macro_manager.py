@@ -13,7 +13,7 @@ import re
 
 from ..utils.constants import (
     MACROS_DIR, BACKUPS_DIR, MACRO_INDEX_FILE,
-    DEFAULT_CATEGORIES, BACKUP_SETTINGS
+    PACKAGE_MACROS_DIR, IS_FROZEN, DEFAULT_CATEGORIES, BACKUP_SETTINGS
 )
 
 
@@ -69,26 +69,36 @@ class MacroManager:
     """매크로 관리자 - CRUD 및 검색 기능"""
 
     def __init__(self):
-        self._macros: Dict[str, Dict[str, Macro]] = {
-            "excel": {},
-            "ppt": {},
-            "word": {}
-        }
-        self._categories: List[str] = list(DEFAULT_CATEGORIES)
+        self._reset_state()
         self._on_change_callbacks: List[Callable] = []
         self._last_state: Optional[str] = None  # 마지막 상태 (undo용)
 
         self._ensure_directories()
         self.load()
 
+    def _reset_state(self):
+        """메모리 상태 초기화"""
+        self._macros: Dict[str, Dict[str, Macro]] = {
+            "excel": {},
+            "ppt": {},
+            "word": {}
+        }
+        self._categories: List[str] = list(DEFAULT_CATEGORIES)
+
     def _ensure_directories(self):
         """필요한 디렉토리 생성"""
         MACROS_DIR.mkdir(parents=True, exist_ok=True)
         BACKUPS_DIR.mkdir(parents=True, exist_ok=True)
 
+        default_index = PACKAGE_MACROS_DIR / "macro_index.json"
+        if IS_FROZEN and not MACRO_INDEX_FILE.exists() and default_index.exists():
+            shutil.copy(default_index, MACRO_INDEX_FILE)
+
     def load(self) -> bool:
         """매크로 데이터 로드"""
         try:
+            self._reset_state()
+
             if not MACRO_INDEX_FILE.exists():
                 self._create_default_file()
                 return True

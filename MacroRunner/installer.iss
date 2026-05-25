@@ -2,7 +2,7 @@
 ; MacroRunner 설치 프로그램
 
 #define MyAppName "MacroRunner"
-#define MyAppVersion "2.0"
+#define MyAppVersion "2.0.0"
 #define MyAppPublisher "MacroRunner"
 #define MyAppExeName "MacroRunner.exe"
 
@@ -26,6 +26,8 @@ PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 ; UI 설정
 WizardStyle=modern
+; 코드 서명 (빌드 후 sign_installer.ps1 실행)
+SignedUninstaller=no
 ; 제거 설정
 Uninstallable=yes
 UninstallDisplayIcon={app}\{#MyAppExeName}

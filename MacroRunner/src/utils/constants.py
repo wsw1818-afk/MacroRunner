@@ -8,10 +8,11 @@ from pathlib import Path
 # 버전 정보
 APP_VERSION = "2.0.0"
 APP_NAME = "MacroRunner"
+IS_FROZEN = getattr(sys, 'frozen', False)
 
 # 경로 설정
 # PyInstaller로 빌드된 경우 실행 파일 위치, 아니면 소스 위치
-if getattr(sys, 'frozen', False):
+if IS_FROZEN:
     # PyInstaller로 빌드된 exe 실행 중
     # exe 파일이 있는 디렉토리 (예: C:\Program Files (x86)\MacroRunner)
     APP_DIR = Path(sys.executable).parent
@@ -22,16 +23,15 @@ else:
     APP_DIR = Path(__file__).parent.parent.parent
     USER_DATA_DIR = APP_DIR
 
-# macros 폴더는 앱 디렉토리에서 먼저 찾고, 없으면 사용자 데이터 폴더 사용
-# 설치 시 함께 배포되는 기본 매크로를 위해
-_app_macros = APP_DIR / "macros"
-_user_macros = USER_DATA_DIR / "macros"
+# EXE 배포본에는 기본 매크로가 앱 디렉토리에 포함될 수 있지만,
+# 실제 저장/수정은 항상 쓰기 권한이 보장되는 사용자 데이터 폴더에서 수행한다.
+PACKAGE_MACROS_DIR = APP_DIR / "macros"
+USER_MACROS_DIR = USER_DATA_DIR / "macros"
 
-# 앱 디렉토리에 macros가 있으면 그것 사용, 없으면 사용자 폴더
-if _app_macros.exists():
-    MACROS_DIR = _app_macros
+if IS_FROZEN:
+    MACROS_DIR = USER_MACROS_DIR
 else:
-    MACROS_DIR = _user_macros
+    MACROS_DIR = PACKAGE_MACROS_DIR if PACKAGE_MACROS_DIR.exists() else USER_MACROS_DIR
 
 # backups와 config는 항상 사용자 데이터 폴더에 저장 (쓰기 권한 보장)
 BACKUPS_DIR = USER_DATA_DIR / "backups"
