@@ -91,8 +91,105 @@ class MacroManager:
         BACKUPS_DIR.mkdir(parents=True, exist_ok=True)
 
         default_index = PACKAGE_MACROS_DIR / "macro_index.json"
-        if IS_FROZEN and not MACRO_INDEX_FILE.exists() and default_index.exists():
-            shutil.copy(default_index, MACRO_INDEX_FILE)
+        if IS_FROZEN and default_index.exists():
+            if not MACRO_INDEX_FILE.exists():
+                shutil.copy(default_index, MACRO_INDEX_FILE)
+            else:
+                self._sync_packaged_defaults(default_index)
+
+    def _sync_packaged_defaults(self, default_index: Path):
+        """EXE 패키지 기본 매크로가 더 최신이면 사용자 사본에 병합"""
+        try:
+            with open(default_index, "r", encoding="utf-8") as f:
+                packaged_data = json.load(f)
+            with open(MACRO_INDEX_FILE, "r", encoding="utf-8") as f:
+                user_data = json.load(f)
+        except Exception:
+            return
+
+        changed = False
+
+        user_categories = user_data.setdefault("_categories", [])
+        for category in packaged_data.get("_categories", []):
+            if category not in user_categories:
+                user_categories.append(category)
+                changed = True
+
+        for program in ["excel", "ppt", "word"]:
+            packaged_macros = packaged_data.get(program, {})
+            user_macros = user_data.setdefault(program, {})
+
+            for name, packaged_macro in packaged_macros.items():
+                user_macro = user_macros.get(name)
+                if user_macro is None:
+                    user_macros[name] = packaged_macro
+                    changed = True
+                    continue
+
+                if self._is_packaged_macro_newer(packaged_macro, user_macro):
+                    user_macros[name] = self._merge_packaged_macro(
+                        packaged_macro, user_macro
+                    )
+                    changed = True
+
+        if changed:
+            with open(MACRO_INDEX_FILE, "w", encoding="utf-8") as f:
+                json.dump(user_data, f, ensure_ascii=False, indent=2)
+
+    @staticmethod
+    def _is_packaged_macro_newer(packaged_macro: Dict, user_macro: Dict) -> bool:
+        packaged_modified = MacroManager._parse_datetime(packaged_macro.get("modified"))
+        user_modified = MacroManager._parse_datetime(user_macro.get("modified"))
+
+        if packaged_modified and user_modified and user_modified > packaged_modified:
+            return False
+
+        packaged_version = MacroManager._safe_int(packaged_macro.get("version"))
+        user_version = MacroManager._safe_int(user_macro.get("version"))
+
+        if packaged_version > user_version:
+            return True
+
+        if packaged_modified and user_modified:
+            return packaged_modified > user_modified
+
+        return False
+
+    @staticmethod
+    def _merge_packaged_macro(packaged_macro: Dict, user_macro: Dict) -> Dict:
+        merged = dict(packaged_macro)
+
+        for key in ["favorite", "use_count", "last_used", "created"]:
+            if key in user_macro:
+                merged[key] = user_macro[key]
+
+        history = list(user_macro.get("history", []))
+        if user_macro.get("code") and user_macro.get("code") != packaged_macro.get("code"):
+            history.append({
+                "version": user_macro.get("version", 1),
+                "modified": user_macro.get("modified"),
+                "code": user_macro.get("code")
+            })
+        if history:
+            merged["history"] = history
+
+        return merged
+
+    @staticmethod
+    def _safe_int(value, default: int = 0) -> int:
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return default
+
+    @staticmethod
+    def _parse_datetime(value):
+        if not value:
+            return None
+        try:
+            return datetime.fromisoformat(value)
+        except (TypeError, ValueError):
+            return None
 
     def load(self) -> bool:
         """매크로 데이터 로드"""
