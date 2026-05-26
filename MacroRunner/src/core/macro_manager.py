@@ -3,6 +3,7 @@
 JSON 기반 매크로 저장, 로드, 검색, 카테고리 관리
 """
 import json
+import logging
 import os
 import shutil
 from datetime import datetime
@@ -15,6 +16,8 @@ from ..utils.constants import (
     MACROS_DIR, BACKUPS_DIR, MACRO_INDEX_FILE,
     PACKAGE_MACROS_DIR, IS_FROZEN, DEFAULT_CATEGORIES, BACKUP_SETTINGS
 )
+
+logger = logging.getLogger("MacroRunner")
 
 
 @dataclass
@@ -94,6 +97,7 @@ class MacroManager:
         if IS_FROZEN and default_index.exists():
             if not MACRO_INDEX_FILE.exists():
                 shutil.copy(default_index, MACRO_INDEX_FILE)
+                logger.info("Copied packaged macro index to user data. source=%s target=%s", default_index, MACRO_INDEX_FILE)
             else:
                 self._sync_packaged_defaults(default_index)
 
@@ -127,6 +131,15 @@ class MacroManager:
                     continue
 
                 if self._is_packaged_macro_newer(packaged_macro, user_macro):
+                    logger.info(
+                        "Updating user macro from packaged defaults. program=%s macro=%s packaged_version=%s user_version=%s packaged_modified=%s user_modified=%s",
+                        program,
+                        name,
+                        packaged_macro.get("version"),
+                        user_macro.get("version"),
+                        packaged_macro.get("modified"),
+                        user_macro.get("modified"),
+                    )
                     user_macros[name] = self._merge_packaged_macro(
                         packaged_macro, user_macro
                     )
@@ -138,17 +151,17 @@ class MacroManager:
 
     @staticmethod
     def _is_packaged_macro_newer(packaged_macro: Dict, user_macro: Dict) -> bool:
-        packaged_modified = MacroManager._parse_datetime(packaged_macro.get("modified"))
-        user_modified = MacroManager._parse_datetime(user_macro.get("modified"))
-
-        if packaged_modified and user_modified and user_modified > packaged_modified:
-            return False
-
         packaged_version = MacroManager._safe_int(packaged_macro.get("version"))
         user_version = MacroManager._safe_int(user_macro.get("version"))
 
         if packaged_version > user_version:
             return True
+
+        packaged_modified = MacroManager._parse_datetime(packaged_macro.get("modified"))
+        user_modified = MacroManager._parse_datetime(user_macro.get("modified"))
+
+        if packaged_modified and user_modified and user_modified > packaged_modified:
+            return False
 
         if packaged_modified and user_modified:
             return packaged_modified > user_modified

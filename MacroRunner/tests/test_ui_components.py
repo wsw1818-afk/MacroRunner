@@ -11,6 +11,38 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
+class TestFunctionDisplay:
+    """Execution function display labels."""
+
+    def test_known_macro_function_label_is_korean(self):
+        from src.ui.main_window import _format_function_label
+
+        assert (
+            _format_function_label("Sub", "MR_FitPictures_KeepAspect")
+            == "비율 유지로 맞추기"
+        )
+
+    def test_unknown_macro_function_label_keeps_vba_name(self):
+        from src.ui.main_window import _format_function_label
+
+        assert _format_function_label("Sub", "CustomRun") == "Sub CustomRun()"
+
+    def test_resolve_korean_function_label(self):
+        from src.ui.main_window import _resolve_function_selection
+
+        function_map = {"영역 꽉 채우기": "MR_FitPictures_Fill"}
+
+        assert (
+            _resolve_function_selection("영역 꽉 채우기", function_map)
+            == "MR_FitPictures_Fill"
+        )
+
+    def test_resolve_legacy_function_label(self):
+        from src.ui.main_window import _resolve_function_selection
+
+        assert _resolve_function_selection("Sub CustomRun()", {}) == "CustomRun"
+
+
 class TestCodeEditor:
     """CodeEditor 테스트"""
 

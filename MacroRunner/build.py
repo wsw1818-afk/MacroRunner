@@ -1,94 +1,76 @@
 """
-PyInstaller 빌드 스크립트
-MacroRunner v2.0
+PyInstaller build script for MacroRunner.
 """
-import PyInstaller.__main__
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 
-# 프로젝트 경로
+import PyInstaller.__main__
+
 PROJECT_ROOT = Path(__file__).parent
 DIST_DIR = PROJECT_ROOT / "dist"
 BUILD_DIR = PROJECT_ROOT / "build"
-RESULT_DIR = Path(r"D:\OneDrive\코드작업\결과물")
+EXE_NAME = "MacroRunner.exe"
+DIST_EXE = DIST_DIR / EXE_NAME
+RESULT_DIR = Path("D:/OneDrive") / "\ucf54\ub4dc\uc791\uc5c5" / "\uacb0\uacfc\ubb3c"
+RESULT_APP_DIR = RESULT_DIR / "MacroRunner"
+RESULT_EXE = RESULT_APP_DIR / EXE_NAME
+
 
 def clean():
-    """이전 빌드 정리"""
+    """Remove previous build artifacts."""
     if DIST_DIR.exists():
         shutil.rmtree(DIST_DIR)
     if BUILD_DIR.exists():
         shutil.rmtree(BUILD_DIR)
 
-    # spec 파일 삭제
     for spec in PROJECT_ROOT.glob("*.spec"):
         spec.unlink()
 
+
 def build():
-    """PyInstaller 빌드 실행"""
+    """Run PyInstaller as a single portable EXE."""
     clean()
 
     PyInstaller.__main__.run([
         str(PROJECT_ROOT / "src" / "main.py"),
         "--name", "MacroRunner",
-        "--onedir",
+        "--onefile",
         "--windowed",
         "--noconfirm",
-
-        # 아이콘 (있는 경우)
-        # "--icon", str(PROJECT_ROOT / "assets" / "icon.ico"),
-
-        # 숨겨진 임포트
         "--hidden-import", "win32com.client",
         "--hidden-import", "pythoncom",
         "--hidden-import", "tkinter",
         "--hidden-import", "tkinter.ttk",
-
-        # 데이터 파일
         "--add-data", f"{PROJECT_ROOT / 'macros'};macros",
-
-        # 최적화
         "--optimize", "2",
-
-        # 출력 디렉토리
         "--distpath", str(DIST_DIR),
         "--workpath", str(BUILD_DIR),
     ])
 
+
 def post_build():
-    """빌드 후 처리"""
-    # macros 폴더 확인
-    macros_dir = DIST_DIR / "MacroRunner" / "macros"
-    macros_dir.mkdir(exist_ok=True)
-
-    # 기본 macro_index.json 복사
-    src_index = PROJECT_ROOT / "macros" / "macro_index.json"
-    dst_index = macros_dir / "macro_index.json"
-
-    if src_index.exists() and not dst_index.exists():
-        shutil.copy(src_index, dst_index)
-
-    # backups 폴더 생성
-    backups_dir = DIST_DIR / "MacroRunner" / "backups"
-    backups_dir.mkdir(exist_ok=True)
+    """Validate build output."""
+    if not DIST_EXE.exists():
+        raise FileNotFoundError(f"Build output was not created: {DIST_EXE}")
 
     print("\n" + "=" * 50)
-    print("빌드 완료!")
-    print(f"출력 경로: {DIST_DIR / 'MacroRunner'}")
+    print("Build complete.")
+    print(f"Output file: {DIST_EXE}")
     print("=" * 50)
 
+
 def sign_exe():
-    """빌드된 EXE에 코드 서명 적용"""
-    exe_path = DIST_DIR / "MacroRunner" / "MacroRunner.exe"
-    if not exe_path.exists():
-        print("서명 대상 EXE가 없습니다.")
+    """Apply Authenticode signing to the built EXE."""
+    if not DIST_EXE.exists():
+        print("Signing target EXE was not found.")
         return False
 
     ps_script = f"""
 $ErrorActionPreference = 'Stop'
 $exePath = @'
-{exe_path}
+{DIST_EXE}
 '@
 $cert = Get-ChildItem Cert:\\CurrentUser\\My |
     Where-Object {{ $_.Subject -like '*MacroRunner*' }} |
@@ -108,37 +90,41 @@ if ($result.Status -eq 'Valid') {{
 """
     result = subprocess.run(
         ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_script],
-        capture_output=True, text=True
+        capture_output=True,
+        text=True,
     )
     if result.returncode == 0:
         print("Code signing complete.")
         return True
-    else:
-        print(f"Code signing failed: {result.stderr.strip()}")
-        return False
+
+    print(f"Code signing failed: {result.stderr.strip()}")
+    return False
+
 
 def copy_results():
-    """빌드 결과물을 결과물 폴더로 복사"""
-    app_source = DIST_DIR / "MacroRunner"
-    app_target = RESULT_DIR / "MacroRunner"
-
-    if not app_source.exists():
-        print("복사할 빌드 결과물이 없습니다.")
+    """Copy the portable EXE to the shared result folder."""
+    if not DIST_EXE.exists():
+        print("Build output to copy was not found.")
         return False
 
-    RESULT_DIR.mkdir(parents=True, exist_ok=True)
+    RESULT_APP_DIR.mkdir(parents=True, exist_ok=True)
 
-    stale_installer = RESULT_DIR / "MacroRunner_Setup.exe"
-    if stale_installer.exists():
-        stale_installer.unlink()
+    for stale_dir in [RESULT_APP_DIR / "_internal", RESULT_APP_DIR / "macros"]:
+        if stale_dir.exists():
+            shutil.rmtree(stale_dir)
 
-    shutil.copytree(app_source, app_target, dirs_exist_ok=True)
+    for stale_file in [RESULT_DIR / "MacroRunner_Setup.exe", RESULT_APP_DIR / "MacroRunner_Setup.exe"]:
+        if stale_file.exists():
+            stale_file.unlink()
+
+    shutil.copy2(DIST_EXE, RESULT_EXE)
 
     print("\n" + "=" * 50)
-    print("결과물 복사 완료!")
-    print(f"결과물 경로: {app_target}")
+    print("Result copy complete.")
+    print(f"Portable EXE: {RESULT_EXE}")
     print("=" * 50)
     return True
+
 
 if __name__ == "__main__":
     build()

@@ -5,6 +5,7 @@
 import tkinter as tk
 from tkinter import ttk
 import json
+import logging
 from pathlib import Path
 from typing import Optional
 from datetime import datetime
@@ -24,6 +25,36 @@ from .dialogs import (
 )
 
 
+logger = logging.getLogger("MacroRunner")
+
+NO_FUNCTION_LABEL = "(함수 없음)"
+FUNCTION_DISPLAY_NAMES = {
+    "MR_FitPictures_KeepAspect": "비율 유지로 맞추기",
+    "MR_FitPictures_Fill": "영역 꽉 채우기",
+    "MR_FitPictures_KeepAspect_WithCompressInfo": "비율 유지 + 압축 안내",
+    "MR_FitPictures_Fill_WithCompressInfo": "꽉 채우기 + 압축 안내",
+    "MR_ShowCompressInfo": "이미지 압축 안내",
+}
+
+
+def _format_function_label(function_type: str, function_name: str) -> str:
+    return FUNCTION_DISPLAY_NAMES.get(
+        function_name,
+        f"{function_type} {function_name}()"
+    )
+
+
+def _resolve_function_selection(selected: str, function_map: dict) -> Optional[str]:
+    if selected in function_map:
+        return function_map[selected]
+
+    match = re.match(r'(Sub|Function)\s+(\w+)\(\)', selected)
+    if not match:
+        return None
+
+    return match.group(2)
+
+
 class MainWindow(tk.Tk):
     """메인 애플리케이션 윈도우"""
 
@@ -39,6 +70,7 @@ class MainWindow(tk.Tk):
             self.office_connector = OfficeConnector()
 
         self._current_macro: Optional[Macro] = None
+        self._function_name_by_label = {}
         self._unsaved_changes = False
         self._settings = self._load_settings()
 
@@ -279,6 +311,7 @@ class MainWindow(tk.Tk):
                 self._save_current_macro()
 
         self._current_macro = macro
+        logger.info("Macro selected. program=%s macro=%s", macro.program, macro.name)
         self._load_macro_to_editor(macro)
         self._unsaved_changes = False
         self._update_modified_label()
@@ -295,14 +328,33 @@ class MainWindow(tk.Tk):
     def _update_function_list(self):
         """함수 목록 업데이트"""
         functions = self.code_editor.extract_functions()
+        self._function_name_by_label = {}
 
         if functions:
-            values = [f"{t} {n}()" for t, n in functions]
+            values = []
+            for function_type, function_name in functions:
+                label = _format_function_label(function_type, function_name)
+                if label in self._function_name_by_label:
+                    label = f"{label} ({function_name})"
+                values.append(label)
+                self._function_name_by_label[label] = function_name
+
             self.function_combo.configure(values=values)
             self.function_combo.set(values[0])
+            logger.info(
+                "Execution menu updated. macro=%s labels=%s functions=%s",
+                self._current_macro.name if self._current_macro else None,
+                values,
+                [name for _, name in functions]
+            )
         else:
-            self.function_combo.configure(values=["(함수 없음)"])
-            self.function_combo.set("(함수 없음)")
+            self.function_combo.configure(values=[NO_FUNCTION_LABEL])
+            self.function_combo.set(NO_FUNCTION_LABEL)
+            logger.info(
+                "Execution menu updated. macro=%s labels=%s functions=[]",
+                self._current_macro.name if self._current_macro else None,
+                [NO_FUNCTION_LABEL]
+            )
 
     def _on_code_change(self):
         """코드 변경"""
@@ -497,8 +549,13 @@ class MainWindow(tk.Tk):
 
         program = self.sidebar.get_current_program()
         code = self.code_editor.get_code()
+        logger.info(
+            "Inject macro requested. program=%s macro=%s code_length=%s",
+            program, self._current_macro.name, len(code)
+        )
 
         success, message = self.office_connector.inject_macro(program, code)
+        logger.info("Inject macro result. success=%s message=%s", success, message)
 
         if success:
             self.macro_manager.record_usage(program, self._current_macro.name)
@@ -513,20 +570,27 @@ class MainWindow(tk.Tk):
             return
 
         selected = self.function_combo.get()
-        if not selected or selected == "(함수 없음)":
+        if not selected or selected == NO_FUNCTION_LABEL:
             self.statusbar.log_error("실행할 함수를 선택하세요")
             return
 
-        match = re.match(r'(Sub|Function)\s+(\w+)\(\)', selected)
-        if not match:
+        function_name = _resolve_function_selection(selected, self._function_name_by_label)
+        if not function_name:
             self.statusbar.log_error("함수 형식 오류")
             return
 
-        function_name = match.group(2)
         program = self.sidebar.get_current_program()
         code = self.code_editor.get_code()
+        logger.info(
+            "Inject and run requested. program=%s macro=%s function=%s code_length=%s",
+            program, self._current_macro.name, function_name, len(code)
+        )
 
         success, message = self.office_connector.inject_and_run(program, code, function_name)
+        logger.info(
+            "Inject and run result. success=%s function=%s message=%s",
+            success, function_name, message
+        )
 
         if success:
             self.macro_manager.record_usage(program, self._current_macro.name)
@@ -585,7 +649,9 @@ class MainWindow(tk.Tk):
                 self.statusbar.log_error("VBA 파일 가져오기 실패")
 
 
-def run_app(use_mock: bool = False):
+def run_app(use_mock: bool = False, auto_close_ms: Optional[int] = None):
     """애플리케이션 실행"""
     app = MainWindow(use_mock=use_mock)
+    if auto_close_ms is not None:
+        app.after(auto_close_ms, app.destroy)
     app.mainloop()

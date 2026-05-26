@@ -7,6 +7,7 @@ from pathlib import Path
 
 # 버전 정보
 APP_VERSION = "2.0.0"
+APP_BUILD = "2026-05-26 onefile-ko-menu-excel-debug"
 APP_NAME = "MacroRunner"
 IS_FROZEN = getattr(sys, 'frozen', False)
 
@@ -16,16 +17,18 @@ if IS_FROZEN:
     # PyInstaller로 빌드된 exe 실행 중
     # exe 파일이 있는 디렉토리 (예: C:\Program Files (x86)\MacroRunner)
     APP_DIR = Path(sys.executable).parent
+    PACKAGE_DIR = Path(getattr(sys, "_MEIPASS", APP_DIR))
     # 사용자 데이터는 AppData에 저장 (쓰기 권한 보장)
     USER_DATA_DIR = Path(os.environ.get('LOCALAPPDATA', Path.home())) / APP_NAME
 else:
     # 개발 환경 - 소스 디렉토리 사용
     APP_DIR = Path(__file__).parent.parent.parent
+    PACKAGE_DIR = APP_DIR
     USER_DATA_DIR = APP_DIR
 
 # EXE 배포본에는 기본 매크로가 앱 디렉토리에 포함될 수 있지만,
 # 실제 저장/수정은 항상 쓰기 권한이 보장되는 사용자 데이터 폴더에서 수행한다.
-PACKAGE_MACROS_DIR = APP_DIR / "macros"
+PACKAGE_MACROS_DIR = PACKAGE_DIR / "macros"
 USER_MACROS_DIR = USER_DATA_DIR / "macros"
 
 if IS_FROZEN:

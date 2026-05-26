@@ -314,8 +314,8 @@ class TestMacroManager:
         assert "Automation" in frozen_manager.get_categories()
         assert any("OldCode" in item["code"] for item in macro.history)
 
-    def test_frozen_sync_keeps_newer_user_macro(self, temp_dir, monkeypatch):
-        """User-edited macros newer than the package are preserved."""
+    def test_frozen_sync_uses_higher_packaged_version(self, temp_dir, monkeypatch):
+        """Packaged default macro updates win when their version is higher."""
         from src.core import macro_manager as macro_manager_module
 
         package_macros = temp_dir / "package" / "macros"
@@ -371,7 +371,77 @@ class TestMacroManager:
 
         frozen_manager = MacroManager()
 
+        assert frozen_manager.get("excel", "BuiltIn").code == "Sub PackageCode()\nEnd Sub"
+
+    def test_frozen_sync_keeps_newer_user_macro_at_same_version(self, temp_dir, monkeypatch):
+        """User-edited macros newer than the package are preserved when versions match."""
+        from src.core import macro_manager as macro_manager_module
+
+        package_macros = temp_dir / "package" / "macros"
+        user_macros = temp_dir / "user" / "macros"
+        package_macros.mkdir(parents=True)
+        user_macros.mkdir(parents=True)
+
+        package_data = {
+            "_categories": ["General"],
+            "excel": {
+                "BuiltIn": {
+                    "name": "BuiltIn",
+                    "code": "Sub PackageCode()\nEnd Sub",
+                    "program": "excel",
+                    "version": 2,
+                    "modified": "2026-05-25T00:00:00"
+                }
+            },
+            "ppt": {},
+            "word": {}
+        }
+        user_data = {
+            "_categories": ["General"],
+            "excel": {
+                "BuiltIn": {
+                    "name": "BuiltIn",
+                    "code": "Sub UserCode()\nEnd Sub",
+                    "program": "excel",
+                    "version": 2,
+                    "modified": "2026-06-01T00:00:00"
+                }
+            },
+            "ppt": {},
+            "word": {}
+        }
+
+        (package_macros / "macro_index.json").write_text(
+            json.dumps(package_data), encoding="utf-8"
+        )
+        (user_macros / "macro_index.json").write_text(
+            json.dumps(user_data), encoding="utf-8"
+        )
+
+        monkeypatch.setattr(macro_manager_module, "IS_FROZEN", True)
+        monkeypatch.setattr(macro_manager_module, "PACKAGE_MACROS_DIR", package_macros)
+        monkeypatch.setattr(macro_manager_module, "MACROS_DIR", user_macros)
+        monkeypatch.setattr(macro_manager_module, "BACKUPS_DIR", temp_dir / "backups")
+        monkeypatch.setattr(
+            macro_manager_module,
+            "MACRO_INDEX_FILE",
+            user_macros / "macro_index.json"
+        )
+
+        frozen_manager = MacroManager()
+
         assert frozen_manager.get("excel", "BuiltIn").code == "Sub UserCode()\nEnd Sub"
+
+    def test_packaged_excel_macro_has_debug_logging(self):
+        """The packaged Excel placement macro includes target-selection diagnostics."""
+        index_path = Path(__file__).parent.parent / "macros" / "macro_index.json"
+        data = json.loads(index_path.read_text(encoding="utf-8"))
+        macro = next(iter(data["excel"].values()))
+
+        assert macro["version"] >= 5
+        assert "MR_RectGapDistance" in macro["code"]
+        assert "MR_LogDebug" in macro["code"]
+        assert "MacroRunner_excel_debug.log" in macro["code"]
 
     def test_export_import(self, manager, temp_dir):
         """내보내기/가져오기 테스트"""
