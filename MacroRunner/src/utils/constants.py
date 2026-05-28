@@ -7,7 +7,7 @@ from pathlib import Path
 
 # 버전 정보
 APP_VERSION = "2.0.0"
-APP_BUILD = "2026-05-26 onefile-ko-menu-excel-debug"
+APP_BUILD = "2026-05-28 fill-position-fix"
 APP_NAME = "MacroRunner"
 IS_FROZEN = getattr(sys, 'frozen', False)
 

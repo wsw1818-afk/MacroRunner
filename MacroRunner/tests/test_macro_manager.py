@@ -438,10 +438,20 @@ class TestMacroManager:
         data = json.loads(index_path.read_text(encoding="utf-8"))
         macro = next(iter(data["excel"].values()))
 
-        assert macro["version"] >= 5
+        assert macro["version"] >= 6
         assert "MR_RectGapDistance" in macro["code"]
         assert "MR_LogDebug" in macro["code"]
         assert "MacroRunner_excel_debug.log" in macro["code"]
+
+    def test_packaged_excel_fill_sets_position_after_size(self):
+        """Excel can shift pictures while resizing, so fill mode positions last."""
+        index_path = Path(__file__).parent.parent / "macros" / "macro_index.json"
+        data = json.loads(index_path.read_text(encoding="utf-8"))
+        code = next(iter(data["excel"].values()))["code"]
+        fill_body = code.split("Private Sub MR_PlaceFill", 1)[1].split("End Sub", 1)[0]
+
+        assert fill_body.index(".Width = target.Width") < fill_body.index(".Left = target.Left")
+        assert fill_body.index(".Height = target.Height") < fill_body.index(".Top = target.Top")
 
     def test_export_import(self, manager, temp_dir):
         """내보내기/가져오기 테스트"""
