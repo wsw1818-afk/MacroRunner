@@ -11,6 +11,19 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
+@pytest.fixture(scope="module")
+def tk_root():
+    """Shared Tk root for UI widget tests."""
+    try:
+        root = tk.Tk()
+    except tk.TclError as exc:
+        pytest.skip(f"GUI not available: {exc}")
+
+    root.withdraw()
+    yield root
+    root.destroy()
+
+
 class TestFunctionDisplay:
     """Execution function display labels."""
 
@@ -47,12 +60,9 @@ class TestCodeEditor:
     """CodeEditor 테스트"""
 
     @pytest.fixture
-    def root(self):
-        """테스트용 Tk 루트"""
-        root = tk.Tk()
-        root.withdraw()  # 창 숨기기
-        yield root
-        root.destroy()
+    def root(self, tk_root):
+        """Shared Tk root for CodeEditor tests."""
+        return tk_root
 
     @pytest.fixture
     def editor(self, root):
@@ -208,11 +218,9 @@ class TestStatusBar:
     """StatusBar 테스트"""
 
     @pytest.fixture
-    def root(self):
-        root = tk.Tk()
-        root.withdraw()
-        yield root
-        root.destroy()
+    def root(self, tk_root):
+        """Shared Tk root for StatusBar tests."""
+        return tk_root
 
     @pytest.fixture
     def statusbar(self, root):
