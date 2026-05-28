@@ -60,6 +60,44 @@ class TestFunctionDisplay:
         assert _resolve_function_selection("Sub CustomRun()", {}) == "CustomRun"
 
 
+class TestMainWindowSizing:
+    """Default window sizing."""
+
+    def test_default_window_uses_larger_layout_on_normal_screen(self):
+        from src.ui.main_window import _window_size_for_screen
+
+        width, height, min_width, min_height = _window_size_for_screen(1366, 768)
+
+        assert width == 1180
+        assert height == 698
+        assert min_width == 960
+        assert min_height == 680
+
+    def test_default_window_is_clamped_to_small_screen(self):
+        from src.ui.main_window import _window_size_for_screen
+
+        width, height, min_width, min_height = _window_size_for_screen(1024, 768)
+
+        assert width == 984
+        assert height == 698
+        assert min_width == 960
+        assert min_height == 680
+
+    def test_saved_geometry_size_parsing(self):
+        from src.ui.main_window import _parse_geometry_size
+
+        assert _parse_geometry_size("950x650+10+20") == (950, 650)
+        assert _parse_geometry_size("bad") is None
+
+    def test_saved_geometry_must_fit_current_screen_bounds(self):
+        from src.ui.main_window import _is_saved_geometry_usable
+
+        assert _is_saved_geometry_usable("984x698+20+20", 960, 680, 984, 698, 1200, 900)
+        assert not _is_saved_geometry_usable("950x650+20+20", 960, 680, 984, 698, 1200, 900)
+        assert not _is_saved_geometry_usable("1200x800+20+20", 960, 680, 984, 698, 1200, 900)
+        assert not _is_saved_geometry_usable("984x698+20+220", 960, 680, 984, 698, 1200, 900)
+
+
 class TestCodeEditor:
     """CodeEditor 테스트"""
 

@@ -7,7 +7,7 @@ from tkinter import ttk
 import json
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 from datetime import datetime
 from dataclasses import replace
 import re
@@ -27,6 +27,14 @@ from .dialogs import (
 
 logger = logging.getLogger("MacroRunner")
 
+DEFAULT_WINDOW_WIDTH = 1180
+DEFAULT_WINDOW_HEIGHT = 760
+MIN_WINDOW_WIDTH = 960
+MIN_WINDOW_HEIGHT = 680
+WINDOW_SCREEN_MARGIN_X = 40
+WINDOW_SCREEN_MARGIN_Y = 70
+SIDEBAR_WIDTH = 280
+
 NO_FUNCTION_LABEL = "(함수 없음)"
 FUNCTION_DISPLAY_NAMES = {
     "MR_FitPictures_KeepAspect": "비율 유지로 맞추기",
@@ -37,6 +45,67 @@ FUNCTION_DISPLAY_NAMES = {
     "MR_FitPictures_Fill_WithCompressInfo": "꽉 채우기 + 압축 안내",
     "MR_ShowCompressInfo": "이미지 압축 안내",
 }
+
+
+def _window_size_for_screen(screen_width: int, screen_height: int) -> Tuple[int, int, int, int]:
+    max_width, max_height = _window_max_size_for_screen(screen_width, screen_height)
+    min_width = min(MIN_WINDOW_WIDTH, max_width)
+    min_height = min(MIN_WINDOW_HEIGHT, max_height)
+    width = max(min(DEFAULT_WINDOW_WIDTH, max_width), min_width)
+    height = max(min(DEFAULT_WINDOW_HEIGHT, max_height), min_height)
+    return width, height, min_width, min_height
+
+
+def _window_max_size_for_screen(screen_width: int, screen_height: int) -> Tuple[int, int]:
+    return (
+        max(640, screen_width - WINDOW_SCREEN_MARGIN_X),
+        max(520, screen_height - WINDOW_SCREEN_MARGIN_Y),
+    )
+
+
+def _centered_geometry(screen_width: int, screen_height: int, width: int, height: int) -> str:
+    x = max(0, (screen_width - width) // 2)
+    y = max(0, (screen_height - height) // 2)
+    return f"{width}x{height}+{x}+{y}"
+
+
+def _parse_geometry_parts(geometry: str) -> Optional[Tuple[int, int, Optional[int], Optional[int]]]:
+    match = re.match(r"^\s*(\d+)x(\d+)([+-]\d+)?([+-]\d+)?", geometry or "")
+    if not match:
+        return None
+    x = int(match.group(3)) if match.group(3) else None
+    y = int(match.group(4)) if match.group(4) else None
+    return int(match.group(1)), int(match.group(2)), x, y
+
+
+def _parse_geometry_size(geometry: str) -> Optional[Tuple[int, int]]:
+    parts = _parse_geometry_parts(geometry)
+    if not parts:
+        return None
+    return parts[0], parts[1]
+
+
+def _is_saved_geometry_usable(
+    geometry: str,
+    min_width: int,
+    min_height: int,
+    max_width: int,
+    max_height: int,
+    screen_width: Optional[int] = None,
+    screen_height: Optional[int] = None,
+) -> bool:
+    parts = _parse_geometry_parts(geometry)
+    if not parts:
+        return False
+    width, height, x, y = parts
+    if not (min_width <= width <= max_width and min_height <= height <= max_height):
+        return False
+    if screen_width is not None and screen_height is not None and x is not None and y is not None:
+        if x < 0 or y < 0:
+            return False
+        if x + width > screen_width or y + height > screen_height:
+            return False
+    return True
 
 
 def _format_function_label(function_type: str, function_name: str) -> str:
@@ -75,6 +144,10 @@ class MainWindow(tk.Tk):
         self._function_name_by_label = {}
         self._unsaved_changes = False
         self._settings = self._load_settings()
+        self._min_window_width = MIN_WINDOW_WIDTH
+        self._min_window_height = MIN_WINDOW_HEIGHT
+        self._max_window_width = DEFAULT_WINDOW_WIDTH
+        self._max_window_height = DEFAULT_WINDOW_HEIGHT
 
         self._setup_window()
         self._setup_ui()
@@ -89,8 +162,23 @@ class MainWindow(tk.Tk):
         colors = self.theme.colors
 
         self.title(f"{APP_NAME}")
-        self.geometry("950x650")
-        self.minsize(750, 500)
+        width, height, min_width, min_height = _window_size_for_screen(
+            self.winfo_screenwidth(),
+            self.winfo_screenheight()
+        )
+        self._min_window_width = min_width
+        self._min_window_height = min_height
+        self._max_window_width, self._max_window_height = _window_max_size_for_screen(
+            self.winfo_screenwidth(),
+            self.winfo_screenheight()
+        )
+        self.geometry(_centered_geometry(
+            self.winfo_screenwidth(),
+            self.winfo_screenheight(),
+            width,
+            height
+        ))
+        self.minsize(min_width, min_height)
         self.configure(bg=colors["bg_primary"])
 
         self.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -108,20 +196,20 @@ class MainWindow(tk.Tk):
         self.paned = ttk.PanedWindow(self.main_container, orient="horizontal")
         self.paned.pack(fill="both", expand=True)
 
-        # 사이드바 (좌측) - 240px
+        # 사이드바 (좌측)
         self.sidebar = Sidebar(
             self.paned,
             self.macro_manager,
             self.office_connector
         )
-        self.sidebar.configure(width=240)
+        self.sidebar.configure(width=SIDEBAR_WIDTH)
         self.paned.add(self.sidebar, weight=0)
 
         # 메인 에디터 영역
         self.editor_container = ttk.Frame(self.paned, style="TFrame")
         self.paned.add(self.editor_container, weight=1)
 
-        self.after(100, lambda: self.paned.sashpos(0, 240))
+        self.after(100, lambda: self.paned.sashpos(0, SIDEBAR_WIDTH))
 
         self._create_editor_area()
 
@@ -186,21 +274,17 @@ class MainWindow(tk.Tk):
         self.description_entry = ttk.Entry(meta_frame, font=("Segoe UI", 10))
         self.description_entry.pack(side="left", fill="x", expand=True, padx=(4, 0))
 
-        # ===== 코드 에디터 =====
-        self.code_editor = CodeEditor(self.editor_container)
-        self.code_editor.pack(fill="both", expand=True, padx=12, pady=(0, 6))
-
         # ===== 하단 액션 바 =====
         action_bar = ttk.Frame(self.editor_container, style="TFrame")
-        action_bar.pack(fill="x", padx=12, pady=(0, 12))
+        action_bar.pack(side="bottom", fill="x", padx=12, pady=(0, 12))
 
         # 실행 함수 선택
         func_frame = ttk.Frame(action_bar, style="TFrame")
-        func_frame.pack(side="left")
+        func_frame.pack(side="left", fill="x", expand=True)
 
         ttk.Label(func_frame, text="실행:", style="TLabel").pack(side="left")
         self.function_combo = ttk.Combobox(
-            func_frame, state="readonly", width=20, font=("Segoe UI", 10)
+            func_frame, state="readonly", width=28, font=("Segoe UI", 10)
         )
         self.function_combo.pack(side="left", padx=(4, 0))
 
@@ -227,6 +311,10 @@ class MainWindow(tk.Tk):
             btn_frame, text="▶ 실행", style="Primary.TButton",
             command=self._inject_and_run, width=10
         ).pack(side="right")
+
+        # ===== 코드 에디터 =====
+        self.code_editor = CodeEditor(self.editor_container)
+        self.code_editor.pack(fill="both", expand=True, padx=12, pady=(0, 6))
 
     def _setup_shortcuts(self):
         """단축키"""
@@ -295,11 +383,30 @@ class MainWindow(tk.Tk):
 
     def _restore_last_state(self):
         """상태 복원"""
-        if self._settings.get("window_geometry"):
+        saved_geometry = self._settings.get("window_geometry")
+
+        if saved_geometry and _is_saved_geometry_usable(
+            saved_geometry,
+            self._min_window_width,
+            self._min_window_height,
+            self._max_window_width,
+            self._max_window_height,
+            self.winfo_screenwidth(),
+            self.winfo_screenheight(),
+        ):
             try:
-                self.geometry(self._settings["window_geometry"])
+                self.geometry(saved_geometry)
             except:
                 pass
+        elif saved_geometry:
+            logger.info(
+                "Ignored saved window geometry outside functional screen bounds. saved=%s minimum=%sx%s maximum=%sx%s",
+                saved_geometry,
+                self._min_window_width,
+                self._min_window_height,
+                self._max_window_width,
+                self._max_window_height,
+            )
 
         if self._settings.get("theme"):
             self.theme.set_theme(self._settings["theme"])
