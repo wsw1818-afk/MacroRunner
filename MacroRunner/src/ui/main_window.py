@@ -31,6 +31,8 @@ NO_FUNCTION_LABEL = "(함수 없음)"
 FUNCTION_DISPLAY_NAMES = {
     "MR_FitPictures_KeepAspect": "비율 유지로 맞추기",
     "MR_FitPictures_Fill": "영역 꽉 채우기",
+    "MR_FitPictures_KeepAspect_WithMargin": "비율 유지 + 여백",
+    "MR_FitPictures_Fill_WithMargin": "꽉 채우기 + 여백",
     "MR_FitPictures_KeepAspect_WithCompressInfo": "비율 유지 + 압축 안내",
     "MR_FitPictures_Fill_WithCompressInfo": "꽉 채우기 + 압축 안내",
     "MR_ShowCompressInfo": "이미지 압축 안내",

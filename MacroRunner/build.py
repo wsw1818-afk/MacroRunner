@@ -4,6 +4,7 @@ PyInstaller build script for MacroRunner.
 import shutil
 import subprocess
 import sys
+import os
 from datetime import datetime
 from hashlib import sha256
 from pathlib import Path
@@ -19,6 +20,7 @@ RESULT_DIR = Path("D:/OneDrive") / "\ucf54\ub4dc\uc791\uc5c5" / "\uacb0\uacfc\ub
 RESULT_APP_DIR = RESULT_DIR / "MacroRunner"
 RESULT_EXE = RESULT_APP_DIR / EXE_NAME
 RESULT_BACKUP_DIR = RESULT_APP_DIR / "backups"
+SIGN_OUTPUT = os.environ.get("MACRORUNNER_SIGN", "0") == "1"
 
 
 def clean():
@@ -149,7 +151,10 @@ def copy_results():
 if __name__ == "__main__":
     build()
     post_build()
-    if not sign_exe():
-        sys.exit(1)
+    if SIGN_OUTPUT:
+        if not sign_exe():
+            sys.exit(1)
+    else:
+        print("Code signing skipped. Set MACRORUNNER_SIGN=1 to sign the EXE.")
     if not copy_results():
         sys.exit(1)

@@ -34,6 +34,10 @@ class TestFunctionDisplay:
             _format_function_label("Sub", "MR_FitPictures_KeepAspect")
             == "비율 유지로 맞추기"
         )
+        assert (
+            _format_function_label("Sub", "MR_FitPictures_Fill_WithMargin")
+            == "꽉 채우기 + 여백"
+        )
 
     def test_unknown_macro_function_label_keeps_vba_name(self):
         from src.ui.main_window import _format_function_label

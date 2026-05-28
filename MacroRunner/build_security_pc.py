@@ -2,6 +2,9 @@
 Build unsigned MacroRunner variants for restrictive security PCs.
 """
 import shutil
+import subprocess
+from datetime import datetime
+from hashlib import sha256
 from pathlib import Path
 
 import PyInstaller.__main__
@@ -15,6 +18,8 @@ FOLDER_NAME = "MacroRunner_security_folder"
 ONEFILE_EXE = DIST_DIR / f"{ONEFILE_NAME}.exe"
 FOLDER_DIST = DIST_DIR / FOLDER_NAME
 RESULT_ONEFILE_EXE = RESULT_APP_DIR / f"{ONEFILE_NAME}.exe"
+RESULT_PRIMARY_EXE = RESULT_APP_DIR / "MacroRunner.exe"
+RESULT_BACKUP_DIR = RESULT_APP_DIR / "backups"
 RESULT_FOLDER = RESULT_APP_DIR / FOLDER_NAME
 
 
@@ -66,22 +71,65 @@ def build_folder():
     ])
 
 
+def backup_existing_primary():
+    """Back up the current primary EXE before replacing it."""
+    if not RESULT_PRIMARY_EXE.exists():
+        return None
+
+    RESULT_BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    digest = sha256(RESULT_PRIMARY_EXE.read_bytes()).hexdigest().upper()
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_path = RESULT_BACKUP_DIR / f"MacroRunner_primary_{timestamp}_{digest[:12]}.exe"
+    shutil.copy2(RESULT_PRIMARY_EXE, backup_path)
+    return backup_path
+
+
+def remove_existing_tree(path: Path):
+    """Remove an existing output tree, including OneDrive read-only folders."""
+    if not path.exists():
+        return
+
+    def handle_remove_error(func, failed_path, _exc_info):
+        failed = Path(failed_path)
+        failed.chmod(0o700)
+        func(failed_path)
+
+    try:
+        shutil.rmtree(path, onerror=handle_remove_error)
+    except Exception:
+        ps_script = f"""
+$ErrorActionPreference = 'Stop'
+$target = @'
+{path}
+'@
+Remove-Item -LiteralPath $target -Recurse -Force
+"""
+        subprocess.run(
+            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_script],
+            check=True,
+        )
+
+
 def copy_results():
-    """Copy security-PC build outputs without replacing the normal EXE."""
+    """Copy security-PC build outputs and publish the unsigned primary EXE."""
     if not ONEFILE_EXE.exists():
         raise FileNotFoundError(f"One-file build output was not created: {ONEFILE_EXE}")
     if not FOLDER_DIST.exists():
         raise FileNotFoundError(f"Folder build output was not created: {FOLDER_DIST}")
 
     RESULT_APP_DIR.mkdir(parents=True, exist_ok=True)
+    backup_path = backup_existing_primary()
     shutil.copy2(ONEFILE_EXE, RESULT_ONEFILE_EXE)
+    shutil.copy2(ONEFILE_EXE, RESULT_PRIMARY_EXE)
 
-    if RESULT_FOLDER.exists():
-        shutil.rmtree(RESULT_FOLDER)
+    remove_existing_tree(RESULT_FOLDER)
     shutil.copytree(FOLDER_DIST, RESULT_FOLDER)
 
     print("\n" + "=" * 50)
     print("Security PC build complete.")
+    if backup_path:
+        print(f"Previous primary EXE backup: {backup_path}")
+    print(f"Primary unsigned EXE: {RESULT_PRIMARY_EXE}")
     print(f"Unsigned one-file EXE: {RESULT_ONEFILE_EXE}")
     print(f"Unsigned folder build: {RESULT_FOLDER}")
     print("=" * 50)

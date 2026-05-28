@@ -11,6 +11,7 @@ if errorlevel 1 goto :error
 echo.
 echo Build complete.
 echo Outputs:
+echo   D:\OneDrive\코드작업\결과물\MacroRunner\MacroRunner.exe
 echo   D:\OneDrive\코드작업\결과물\MacroRunner\MacroRunner_security_unsigned.exe
 echo   D:\OneDrive\코드작업\결과물\MacroRunner\MacroRunner_security_folder
 exit /b 0
