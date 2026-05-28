@@ -4,6 +4,8 @@ PyInstaller build script for MacroRunner.
 import shutil
 import subprocess
 import sys
+from datetime import datetime
+from hashlib import sha256
 from pathlib import Path
 
 import PyInstaller.__main__
@@ -16,6 +18,7 @@ DIST_EXE = DIST_DIR / EXE_NAME
 RESULT_DIR = Path("D:/OneDrive") / "\ucf54\ub4dc\uc791\uc5c5" / "\uacb0\uacfc\ubb3c"
 RESULT_APP_DIR = RESULT_DIR / "MacroRunner"
 RESULT_EXE = RESULT_APP_DIR / EXE_NAME
+RESULT_BACKUP_DIR = RESULT_APP_DIR / "backups"
 
 
 def clean():
@@ -101,6 +104,20 @@ if ($result.Status -eq 'Valid') {{
     return False
 
 
+def backup_existing_result():
+    """Back up the currently published EXE before replacing it."""
+    if not RESULT_EXE.exists():
+        return None
+
+    RESULT_BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    digest = sha256(RESULT_EXE.read_bytes()).hexdigest().upper()
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_name = f"MacroRunner_{timestamp}_{digest[:12]}.exe"
+    backup_path = RESULT_BACKUP_DIR / backup_name
+    shutil.copy2(RESULT_EXE, backup_path)
+    return backup_path
+
+
 def copy_results():
     """Copy the portable EXE to the shared result folder."""
     if not DIST_EXE.exists():
@@ -108,6 +125,7 @@ def copy_results():
         return False
 
     RESULT_APP_DIR.mkdir(parents=True, exist_ok=True)
+    backup_path = backup_existing_result()
 
     for stale_dir in [RESULT_APP_DIR / "_internal", RESULT_APP_DIR / "macros"]:
         if stale_dir.exists():
@@ -121,6 +139,8 @@ def copy_results():
 
     print("\n" + "=" * 50)
     print("Result copy complete.")
+    if backup_path:
+        print(f"Previous EXE backup: {backup_path}")
     print(f"Portable EXE: {RESULT_EXE}")
     print("=" * 50)
     return True
